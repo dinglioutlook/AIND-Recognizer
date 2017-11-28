@@ -75,10 +75,24 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-
         # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        
+        
+        min_best_score, best_model = float("inf"), None
+        for n in range(self.min_n_components, self.max_n_components):
+            try:
+                p = n ** 2 + 2 * self.X.shape[1] * n - 1
+                model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                logL = model.score(self.X, self.lengths)
+                bic = -2 * logL + p * math.log(self.X.shape[0])
 
+                if min_best_score > bic:
+                    min_best_score, best_model = bic, model
+            except:
+                continue
+
+        return best_model
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -86,16 +100,39 @@ class SelectorDIC(ModelSelector):
     Biem, Alain. "A model selection criterion for classification: Application to hmm topology optimization."
     Document Analysis and Recognition, 2003. Proceedings. Seventh International Conference on. IEEE, 2003.
     http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.58.6208&rep=rep1&type=pdf
-    https://pdfs.semanticscholar.org/ed3d/7c4a5f607201f3848d4c02dd9ba17c791fc2.pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        best_score, best_model = float("-inf"), None
+        for n in range(self.min_n_components, self.max_n_components):
+            p = []
+            try:
+                model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False)
+                model.fit(self.X, self.lengths)
+                logL = model.score(self.X, self.lengths)
+            except:
+                continue
+                
+            for word in self.words:
+                if word is not self.this_word:
+                    try:            
+                        x, length = self.hwords[word]
+                        model_ = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False)
+                        model_.fit(x, length)
+                        s = model_.score(x, length)
+                        p.append(s)
+                    except:
+                        continue
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+            score = logL - np.mean(p)
+            if score > best_score:
+                best_score, best_model = score, model
 
+        return best_model
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
@@ -104,6 +141,24 @@ class SelectorCV(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        splits = 2
+        best_score, best_model = float("-inf"), None
+        for n in range(self.min_n_components, self.max_n_components):
+            model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False)
+            score = []
+            if len(self.sequences) < splits: break
+            for train, test in KFold(splits).split(self.sequences):
+                train_x, train_length = combine_sequences(train, self.sequences)
+                test_x, test_length = combine_sequences(test, self.sequences)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+                try:
+                    model.fit(train_x, train_length)
+                    score.append(model.score(test_x, test_length))
+                except:
+                    break
+            average_score = np.mean(score) if len(score) > 0 else float('-inf')
+            if average_score > best_score:
+                best_score, best_model = average_score, model
+
+        return best_model

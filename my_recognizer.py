@@ -20,6 +20,23 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+
+    for word_id in range(test_set.num_items):
+        best_score, best_guess, log = float("-inf"), None, {}
+        X, lengths = test_set.get_item_Xlengths(word_id)
+
+        for word, model in models.items():
+            try:
+                # It is a GaussianHMM model
+                log[word] = model.score(X, lengths)
+            except:
+                log[word] = float("-inf")
+ 
+            if log[word] > best_score:
+                best_score, best_guess = log[word], word
+
+        probabilities.append(log)
+        guesses.append(best_guess)
+
+    return probabilities, guesses
+    
