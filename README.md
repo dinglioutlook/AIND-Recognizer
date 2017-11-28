@@ -1,4 +1,5 @@
-[Review Result](https://review.udacity.com/#!/reviews/672220)
+[Review Result](https://review.udacity.com/#!/reviews/672220) </br>
+[Resources](RESOURCES.md)
 
 # Artificial Intelligence Engineer Nanodegree
 ## Probabilistic Models
